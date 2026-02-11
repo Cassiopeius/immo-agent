@@ -46,57 +46,37 @@ with col3:
 
 st.markdown("---")
 
-# 5. Der KI-Experten-Check (AUTO-PILOT MODUS)
+# 5. Der KI-Experten-Check (FINALE VERSION)
 st.subheader("💬 Frag den Experten dazu")
 
 if api_key:
     try:
-        # 1. Anmelden
         genai.configure(api_key=api_key)
+        verfuegbare_modelle = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
 
-        # 2. AUTO-SUCHE: Wir fragen Google "Was hast du da?"
-        # Wir listen alle Modelle auf, die Text generieren können.
-        verfuegbare_modelle = []
-        for m in genai.list_models():
-            if 'generateContent' in m.supported_generation_methods:
-                verfuegbare_modelle.append(m.name)
-
-        if not verfuegbare_modelle:
-            st.error("❌ Dein API-Key ist gültig, aber Google zeigt keine Modelle an.")
-            st.stop()
-
-        # 3. AUSWAHL: Wir nehmen bevorzugt 'flash' (schnell), sonst 'pro', sonst das erste.
-        # Das verhindert Schreibfehler oder Versionskonflikte.
-        modell_name = next((m for m in verfuegbare_modelle if 'flash' in m), None)
-        if not modell_name:
-             modell_name = next((m for m in verfuegbare_modelle if 'pro' in m), verfuegbare_modelle[0])
+        # WICHTIG: Wir suchen gezielt nach 1.5-Flash, weil 2.5-Flash nur 20 Fragen erlaubt!
+        modell_name = next((m for m in verfuegbare_modelle if '1.5-flash' in m), None)
         
-        # Kleiner Hinweis für dich (damit du siehst, was läuft)
-        # st.caption(f"Benutze Modell: {modell_name}") 
+        # Falls 1.5 nicht da ist, nehmen wir irgendwas anderes (außer 2.5)
+        if not modell_name:
+             modell_name = next((m for m in verfuegbare_modelle if '2.5' not in m), verfuegbare_modelle[0])
         
         model = genai.GenerativeModel(modell_name)
         
-        # 4. Der Chat
-        kontext = f"""
-        Aktuelle Berechnung:
-        Kaufpreis: {kaufpreis}€, Eigenkapital: {eigenkapital}%, 
-        Darlehen: {darlehen}€, Zins: {zins}%, Rate: {monatsrate:.2f}€.
-        """
+        kontext = f"Kaufpreis: {kaufpreis}€, Eigenkapital: {eigenkapital}%, Rate: {monatsrate:.2f}€."
         
-        if prompt := st.chat_input("Z.B.: Ist diese Rate bei 3000€ Netto tragbar?"):
+        if prompt := st.chat_input("Z.B.: Ist diese Rate bei 4000€ Netto tragbar?"):
             with st.chat_message("user"):
                 st.markdown(prompt)
-                
             with st.chat_message("assistant"):
-                full_prompt = f"{kontext}\nFrage des Nutzers: {prompt}. Antworte kurz und prägnant auf Deutsch."
-                try:
-                    response = model.generate_content(full_prompt)
-                    st.markdown(response.text)
-                except Exception as e:
-                    st.error(f"Fehler bei der Antwort: {e}")
+                full_prompt = f"{kontext}\nFrage: {prompt}. Antworte kurz auf Deutsch."
+                response = model.generate_content(full_prompt)
+                st.markdown(response.text)
 
     except Exception as e:
-        st.error(f"❌ Verbindungsproblem: {e}")
-
+        if "429" in str(e):
+            st.error("⏳ Limit erreicht. Das 2.5er Modell ist gesperrt. Der Code schaltet morgen automatisch auf das 1.5er Modell um.")
+        else:
+            st.error(f"❌ Fehler: {e}")
 else:
-    st.warning("Bitte gib links oben deinen API-Key ein, um die KI-Analyse zu nutzen.")
+    st.warning("Bitte gib links oben deinen API-Key ein.")
