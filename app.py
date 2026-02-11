@@ -80,3 +80,4 @@ if api_key:
             st.error(f"❌ Fehler: {e}")
 else:
     st.warning("Bitte gib links oben deinen API-Key ein.")
+
