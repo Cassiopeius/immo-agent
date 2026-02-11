@@ -51,7 +51,7 @@ st.subheader("💬 Frag den Experten dazu")
 
 if api_key:
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash') # Oder 'gemini-1.5-flash' falls 2.5 noch zickt
+    model = genai.GenerativeModel('gemini-1.5-flash') # Oder 'gemini-1.5-flash' falls 2.5 noch zickt
     
     # Wir bauen dem Agenten den Kontext aus den Reglern
     kontext = f"""
@@ -70,4 +70,5 @@ if api_key:
             response = model.generate_content(full_prompt)
             st.markdown(response.text)
 else:
+
     st.warning("Bitte gib links oben deinen API-Key ein, um die KI-Analyse zu nutzen.")
