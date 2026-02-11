@@ -46,30 +46,53 @@ with col3:
 
 st.markdown("---")
 
-# 5. Der KI-Experten-Check (Optional)
+# 5. Der KI-Experten-Check (ROBUSTER MODUS)
 st.subheader("💬 Frag den Experten dazu")
 
 if api_key:
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash') # Oder 'gemini-1.5-flash' falls 2.5 noch zickt
-    
-    # Wir bauen dem Agenten den Kontext aus den Reglern
-    kontext = f"""
-    Aktuelle Berechnung:
-    Kaufpreis: {kaufpreis}€, Eigenkapital: {eigenkapital}%, 
-    Darlehen: {darlehen}€, Zins: {zins}%, Rate: {monatsrate}€.
-    """
-    
-    if prompt := st.chat_input("Z.B.: Ist diese Rate bei 3000€ Netto tragbar?"):
-        with st.chat_message("user"):
-            st.markdown(prompt)
-            
-        with st.chat_message("assistant"):
-            # Wir senden die Zahlen UND die Frage an die KI
-            full_prompt = f"{kontext}\nFrage des Nutzers: {prompt}. Antworte kurz und prägnant."
-            response = model.generate_content(full_prompt)
-            st.markdown(response.text)
+    # Wir probieren, die KI zu starten und fangen Fehler ab
+    try:
+        genai.configure(api_key=api_key)
+        
+        # 1. Wir fragen Google: "Welche Modelle darf dieser Key benutzen?"
+        # Das verhindert den "NotFound" Fehler, weil wir nur nehmen, was da ist.
+        all_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        
+        if not all_models:
+            st.error("❌ Dein API-Key ist gültig, aber er hat keinen Zugriff auf Text-Modelle. (Liste leer)")
+            st.stop()
+
+        # 2. Wir suchen uns das beste verfügbare Modell aus
+        # Wir bevorzugen 'flash', wenn nicht da, nehmen wir 'pro', sonst das erste was wir finden.
+        active_model_name = next((m for m in all_models if 'flash' in m), None)
+        if not active_model_name:
+             active_model_name = next((m for m in all_models if 'pro' in m), all_models[0])
+        
+        # Starten mit dem gefundenen Modell
+        model = genai.GenerativeModel(active_model_name)
+
+        # 3. Der Kontext für die KI
+        kontext = f"""
+        Aktuelle Berechnung:
+        Kaufpreis: {kaufpreis}€, Eigenkapital: {eigenkapital}%, 
+        Darlehen: {darlehen}€, Zins: {zins}%, Rate: {monatsrate:.2f}€.
+        """
+        
+        # 4. Das Chat-Eingabefeld
+        if prompt := st.chat_input("Z.B.: Ist diese Rate bei 3000€ Netto tragbar?"):
+            with st.chat_message("user"):
+                st.markdown(prompt)
+                
+            with st.chat_message("assistant"):
+                full_prompt = f"{kontext}\nFrage des Nutzers: {prompt}. Antworte kurz und prägnant auf Deutsch."
+                try:
+                    response = model.generate_content(full_prompt)
+                    st.markdown(response.text)
+                except Exception as e:
+                    st.error(f"Fehler bei der Antwort: {e}")
+
+    except Exception as e:
+        st.error(f"❌ Der API-Key scheint nicht zu stimmen oder hat keine Rechte:\n{e}")
+
 else:
-
     st.warning("Bitte gib links oben deinen API-Key ein, um die KI-Analyse zu nutzen.")
-
