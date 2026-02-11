@@ -46,45 +46,57 @@ with col3:
 
 st.markdown("---")
 
-# 5. Der KI-Experten-Check (Stabile Version für 1.5 Flash)
+# 5. Der KI-Experten-Check (AUTO-PILOT MODUS)
 st.subheader("💬 Frag den Experten dazu")
 
 if api_key:
     try:
-        # 1. Konfiguration mit deinem Key
+        # 1. Anmelden
         genai.configure(api_key=api_key)
 
-        # 2. WICHTIG: Wir nutzen fest 'gemini-1.5-flash'
-        # Grund: Das 2.5er Modell hat dich vorhin blockiert (Limit erreicht).
-        # Das 1.5er hat viel höhere Limits (ca. 1500 Anfragen/Tag).
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # 2. AUTO-SUCHE: Wir fragen Google "Was hast du da?"
+        # Wir listen alle Modelle auf, die Text generieren können.
+        verfuegbare_modelle = []
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                verfuegbare_modelle.append(m.name)
+
+        if not verfuegbare_modelle:
+            st.error("❌ Dein API-Key ist gültig, aber Google zeigt keine Modelle an.")
+            st.stop()
+
+        # 3. AUSWAHL: Wir nehmen bevorzugt 'flash' (schnell), sonst 'pro', sonst das erste.
+        # Das verhindert Schreibfehler oder Versionskonflikte.
+        modell_name = next((m for m in verfuegbare_modelle if 'flash' in m), None)
+        if not modell_name:
+             modell_name = next((m for m in verfuegbare_modelle if 'pro' in m), verfuegbare_modelle[0])
         
-        # 3. Kontext aus den Reglern bauen
+        # Kleiner Hinweis für dich (damit du siehst, was läuft)
+        # st.caption(f"Benutze Modell: {modell_name}") 
+        
+        model = genai.GenerativeModel(modell_name)
+        
+        # 4. Der Chat
         kontext = f"""
         Aktuelle Berechnung:
         Kaufpreis: {kaufpreis}€, Eigenkapital: {eigenkapital}%, 
         Darlehen: {darlehen}€, Zins: {zins}%, Rate: {monatsrate:.2f}€.
         """
         
-        # 4. Chat-Eingabe und Antwort
         if prompt := st.chat_input("Z.B.: Ist diese Rate bei 3000€ Netto tragbar?"):
             with st.chat_message("user"):
                 st.markdown(prompt)
                 
             with st.chat_message("assistant"):
                 full_prompt = f"{kontext}\nFrage des Nutzers: {prompt}. Antworte kurz und prägnant auf Deutsch."
-                
-                # Anfrage an die KI senden
-                response = model.generate_content(full_prompt)
-                st.markdown(response.text)
+                try:
+                    response = model.generate_content(full_prompt)
+                    st.markdown(response.text)
+                except Exception as e:
+                    st.error(f"Fehler bei der Antwort: {e}")
 
     except Exception as e:
-        # Fehlermeldung, falls der Key falsch ist oder Google Schluckauf hat
-        st.error(f"❌ Ein Fehler ist aufgetreten: {e}")
-        if "429" in str(e):
-             st.info("Hinweis: Fehler 429 bedeutet 'Zu viele Anfragen'. Probier es morgen wieder oder nutze einen neuen Key.")
+        st.error(f"❌ Verbindungsproblem: {e}")
 
 else:
     st.warning("Bitte gib links oben deinen API-Key ein, um die KI-Analyse zu nutzen.")
-
-
