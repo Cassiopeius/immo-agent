@@ -72,3 +72,4 @@ if api_key:
 else:
 
     st.warning("Bitte gib links oben deinen API-Key ein, um die KI-Analyse zu nutzen.")
+
