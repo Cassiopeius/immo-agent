@@ -46,58 +46,45 @@ with col3:
 
 st.markdown("---")
 
-# 5. Der KI-Experten-Check (ROBUSTER MODUS)
+# 5. Der KI-Experten-Check (Stabile Version für 1.5 Flash)
 st.subheader("💬 Frag den Experten dazu")
 
 if api_key:
-    # Wir probieren, die KI zu starten und fangen Fehler ab
     try:
+        # 1. Konfiguration mit deinem Key
         genai.configure(api_key=api_key)
-        
-        # 1. Wir fragen Google: "Welche Modelle darf dieser Key benutzen?"
-        # Das verhindert den "NotFound" Fehler, weil wir nur nehmen, was da ist.
-        all_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        if not all_models:
-            st.error("❌ Dein API-Key ist gültig, aber er hat keinen Zugriff auf Text-Modelle. (Liste leer)")
-            st.stop()
 
-        # 2. Wir suchen uns das beste verfügbare Modell aus
-        # Wir bevorzugen 'flash', wenn nicht da, nehmen wir 'pro', sonst das erste was wir finden.
-        # Wir erzwingen Version 1.5, weil sie 1500 statt nur 20 Anfragen erlaubt
-if any("models/gemini-1.5-flash" in m for m in all_models):
-    active_model_name = "models/gemini-1.5-flash"
-else:
-    active_model_name = all_models[0]
-        if not active_model_name:
-             active_model_name = next((m for m in all_models if 'pro' in m), all_models[0])
+        # 2. WICHTIG: Wir nutzen fest 'gemini-1.5-flash'
+        # Grund: Das 2.5er Modell hat dich vorhin blockiert (Limit erreicht).
+        # Das 1.5er hat viel höhere Limits (ca. 1500 Anfragen/Tag).
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
-        # Starten mit dem gefundenen Modell
-        model = genai.GenerativeModel(active_model_name)
-
-        # 3. Der Kontext für die KI
+        # 3. Kontext aus den Reglern bauen
         kontext = f"""
         Aktuelle Berechnung:
         Kaufpreis: {kaufpreis}€, Eigenkapital: {eigenkapital}%, 
         Darlehen: {darlehen}€, Zins: {zins}%, Rate: {monatsrate:.2f}€.
         """
         
-        # 4. Das Chat-Eingabefeld
+        # 4. Chat-Eingabe und Antwort
         if prompt := st.chat_input("Z.B.: Ist diese Rate bei 3000€ Netto tragbar?"):
             with st.chat_message("user"):
                 st.markdown(prompt)
                 
             with st.chat_message("assistant"):
                 full_prompt = f"{kontext}\nFrage des Nutzers: {prompt}. Antworte kurz und prägnant auf Deutsch."
-                try:
-                    response = model.generate_content(full_prompt)
-                    st.markdown(response.text)
-                except Exception as e:
-                    st.error(f"Fehler bei der Antwort: {e}")
+                
+                # Anfrage an die KI senden
+                response = model.generate_content(full_prompt)
+                st.markdown(response.text)
 
     except Exception as e:
-        st.error(f"❌ Der API-Key scheint nicht zu stimmen oder hat keine Rechte:\n{e}")
+        # Fehlermeldung, falls der Key falsch ist oder Google Schluckauf hat
+        st.error(f"❌ Ein Fehler ist aufgetreten: {e}")
+        if "429" in str(e):
+             st.info("Hinweis: Fehler 429 bedeutet 'Zu viele Anfragen'. Probier es morgen wieder oder nutze einen neuen Key.")
 
 else:
     st.warning("Bitte gib links oben deinen API-Key ein, um die KI-Analyse zu nutzen.")
+
 
