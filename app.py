@@ -64,7 +64,11 @@ if api_key:
 
         # 2. Wir suchen uns das beste verfügbare Modell aus
         # Wir bevorzugen 'flash', wenn nicht da, nehmen wir 'pro', sonst das erste was wir finden.
-        active_model_name = next((m for m in all_models if 'flash' in m), None)
+        # Wir erzwingen Version 1.5, weil sie 1500 statt nur 20 Anfragen erlaubt
+if any("models/gemini-1.5-flash" in m for m in all_models):
+    active_model_name = "models/gemini-1.5-flash"
+else:
+    active_model_name = all_models[0]
         if not active_model_name:
              active_model_name = next((m for m in all_models if 'pro' in m), all_models[0])
         
@@ -96,3 +100,4 @@ if api_key:
 
 else:
     st.warning("Bitte gib links oben deinen API-Key ein, um die KI-Analyse zu nutzen.")
+
